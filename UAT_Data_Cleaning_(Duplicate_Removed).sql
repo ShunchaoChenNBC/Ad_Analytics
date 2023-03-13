@@ -1,4 +1,4 @@
-DECLARE updt DATE DEFAULT '2022-10-28'; --hard-coded cue point date
+DECLARE updt DATE DEFAULT '2023-03-09'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
@@ -71,11 +71,11 @@ SELECT
          WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 THEN 10
          ELSE 13
          END AS ad_spec
-FROM  `nbcu-sdp-prod-003.sdp_persistent_views.FreewheelCuepointView`   a
+FROM  `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView` a
 LEFT JOIN `nbcu-ds-prod-001.PeacockDataMartSilver.SILVER_COMPASS_METADATA` b 
     ON LOWER(a.assetExternalID) = LOWER(b.ContentID)
 LEFT JOIN (SELECT assetExternalID, cuePointPosition, contentTimePosition as next_break
-           FROM  `nbcu-sdp-prod-003.sdp_persistent_views.FreewheelCuepointView`  ) c 
+           FROM  `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView` ) c 
     ON a.assetExternalID = c.assetExternalID AND SAFE_CAST(a.cuePointPosition AS INT64) = SAFE_CAST(c.cuePointPosition AS INT64)-1
 ),
 tbl2 as (
@@ -103,4 +103,3 @@ select *,
 updt as updated_date
 from tbl2
 group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
-
