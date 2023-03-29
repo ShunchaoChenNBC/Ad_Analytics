@@ -1,8 +1,13 @@
-DECLARE updt DATE DEFAULT '2023-03-09'; --hard-coded cue point date
+DECLARE updt DATE DEFAULT '2023-03-28'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
-CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
-with tbl as (
+CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_UAT` as
+with UAT as (
+select *
+from `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView`
+where EXTRACT(YEAR FROM effectiveTo) = 9999 --- Only select the latest records
+),
+tbl as (
 SELECT 
 
   CASE WHEN seriesTitle IS NULL THEN assetName ELSE seriesTitle END AS Video_Series_Name,
@@ -71,11 +76,11 @@ SELECT
          WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 THEN 10
          ELSE 13
          END AS ad_spec
-FROM  `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView` a
+FROM UAT a
 LEFT JOIN `nbcu-ds-prod-001.PeacockDataMartSilver.SILVER_COMPASS_METADATA` b 
-    ON LOWER(a.assetExternalID) = LOWER(b.ContentID)
+    ON LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) = LOWER(b.ContentID)
 LEFT JOIN (SELECT assetExternalID, cuePointPosition, contentTimePosition as next_break
-           FROM  `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView` ) c 
+           FROM  UAT) c 
     ON a.assetExternalID = c.assetExternalID AND SAFE_CAST(a.cuePointPosition AS INT64) = SAFE_CAST(c.cuePointPosition AS INT64)-1
 ),
 tbl2 as (
