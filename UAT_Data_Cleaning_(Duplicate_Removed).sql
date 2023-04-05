@@ -1,11 +1,12 @@
 DECLARE updt DATE DEFAULT '2023-03-28'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
-CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_UAT` as
+CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
 with UAT as (
 select *
 from `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView`
 where EXTRACT(YEAR FROM effectiveTo) = 9999 --- Only select the latest records
+and assetExternalID not like "%UHDSDR%" and assetExternalID not like "%HDSDR%" --get rid of 4k versions
 ),
 tbl as (
 SELECT 
