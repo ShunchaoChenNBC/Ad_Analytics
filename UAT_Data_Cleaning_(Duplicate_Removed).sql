@@ -1,19 +1,18 @@
-DECLARE updt DATE DEFAULT '2023-03-28'; --hard-coded cue point date
+DECLARE updt DATE DEFAULT '2023-04-07'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
 with UAT as (
 select *
-from `nbcu-sdp-prod-003.sdp_persistent_views_alpha.FreewheelCuepointView`
+from `nbcu-sdp-prod-003.sdp_persistent_views.FreewheelCuepointView`
 where EXTRACT(YEAR FROM effectiveTo) = 9999 --- Only select the latest records
-and assetExternalID not like "%UHDSDR%" and assetExternalID not like "%HDSDR%" --get rid of 4k versions
 ),
 tbl as (
 SELECT 
 
   CASE WHEN seriesTitle IS NULL THEN assetName ELSE seriesTitle END AS Video_Series_Name,
 
-  a.assetExternalID,
+LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) as assetExternalID,
 --  CASE WHEN AssetName = "NULL" THEN NULL ELSE REGEXP_REPLACE(Asset_Name, 'Peacock: ', '') END AS Asset_Name, 
   assetName,
 --  CASE WHEN Asset_Duration = "NULL" THEN NULL ELSE Asset_Duration END AS Asset_Duration, 
