@@ -1,4 +1,5 @@
-DECLARE updt DATE DEFAULT '2023-04-07'; --hard-coded cue point date
+
+DECLARE updt DATE DEFAULT '2023-04-12'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
@@ -79,29 +80,30 @@ LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExterna
 FROM UAT a
 LEFT JOIN `nbcu-ds-prod-001.PeacockDataMartSilver.SILVER_COMPASS_METADATA` b 
     ON LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) = LOWER(b.ContentID)
-LEFT JOIN (SELECT assetExternalID, cuePointPosition, contentTimePosition as next_break
+LEFT JOIN (SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) as assetExternalID, 
+cuePointPosition, contentTimePosition as next_break
            FROM  UAT) c 
     ON a.assetExternalID = c.assetExternalID AND SAFE_CAST(a.cuePointPosition AS INT64) = SAFE_CAST(c.cuePointPosition AS INT64)-1
 ),
 tbl2 as (
-SELECT a.*, 
+SELECT a1.*, 
   --ad grade
-    CASE WHEN a.cuePointLength IS NULL AND a.assetDuration IS NULL   THEN "NULL"
-         WHEN a.cuePointLength IS NULL AND a.ad_spec = 0               THEN "At Spec"
-         WHEN a.cuePointLength IS NULL                               THEN "Below Spec"
-         WHEN SAFE_CAST(a.cuePointLength AS INT64) > a.ad_spec          THEN "Above Spec"
-         WHEN SAFE_CAST(a.cuePointLength AS INT64) = a.ad_spec          THEN "At Spec"
-         WHEN SAFE_CAST(a.cuePointLength AS INT64) < a.ad_spec          THEN "Below Spec"
+    CASE WHEN a1.cuePointLength IS NULL AND a1.assetDuration IS NULL   THEN "NULL"
+         WHEN a1.cuePointLength IS NULL AND a1.ad_spec = 0               THEN "At Spec"
+         WHEN a1.cuePointLength IS NULL                               THEN "Below Spec"
+         WHEN SAFE_CAST(a1.cuePointLength AS INT64) > a1.ad_spec          THEN "Above Spec"
+         WHEN SAFE_CAST(a1.cuePointLength AS INT64) = a1.ad_spec          THEN "At Spec"
+         WHEN SAFE_CAST(a1.cuePointLength AS INT64) < a1.ad_spec          THEN "Below Spec"
          END AS ad_grade
-      , CAST(b.ad_spec AS DECIMAL) / CAST(b.cuePointLength AS DECIMAL) as Multiplier
-      , (CAST(b.cuePointLength AS DECIMAL) + 1) / CAST(b.cuePointLength AS DECIMAL) as Multiplier_just_one_more
-      , c.Content_Segments_MAX, c.Content_Segments_MAX / 2 AS Content_Segments_MAX_split
-FROM tbl a
-  LEFT JOIN tbl b on a.assetExternalID = b.assetExternalID AND a.cuePointLength = b.cuePointPosition
-  LEFT JOIN (select assetExternalID, MAX(Content_Segments) AS Content_Segments_MAX from tbl GROUP BY assetExternalID) c on a.assetExternalID = c.assetExternalID
-WHERE lower(a.assetName) NOT LIKE lower('%do%not%use%') AND lower(a.distributor) NOT LIKE lower('%nbc%test%')
-ORDER BY a.Video_Series_Name, CAST(a.SeasonNumber AS DECIMAL), CAST(a.EpisodeNumber AS DECIMAL)
-  , a.assetName, CAST(a.cuePointPosition AS DECIMAL), assetName
+      , CAST(b1.ad_spec AS DECIMAL) / CAST(b1.cuePointLength AS DECIMAL) as Multiplier
+      , (CAST(b1.cuePointLength AS DECIMAL) + 1) / CAST(b1.cuePointLength AS DECIMAL) as Multiplier_just_one_more
+      , c1.Content_Segments_MAX, c1.Content_Segments_MAX / 2 AS Content_Segments_MAX_split
+FROM tbl a1
+  LEFT JOIN tbl b1 on a1.assetExternalID = b1.assetExternalID AND a1.cuePointLength = b1.cuePointPosition
+  LEFT JOIN (select assetExternalID, MAX(Content_Segments) AS Content_Segments_MAX from tbl GROUP BY assetExternalID) c1 on a1.assetExternalID = c1.assetExternalID
+-- WHERE lower(a1.assetName) NOT LIKE lower('%do%not%use%') AND lower(a1.distributor) NOT LIKE lower('%nbc%test%')
+ORDER BY a1.Video_Series_Name, CAST(a1.SeasonNumber AS DECIMAL), CAST(a1.EpisodeNumber AS DECIMAL)
+  , a1.assetName, CAST(a1.cuePointPosition AS DECIMAL), assetName
 )
 
 select *, 
