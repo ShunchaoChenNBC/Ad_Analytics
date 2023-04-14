@@ -7,6 +7,7 @@ with UAT as (
 select *
 from `nbcu-sdp-prod-003.sdp_persistent_views.FreewheelCuepointView`
 where EXTRACT(YEAR FROM effectiveTo) = 9999 --- Only select the latest records
+group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35 -- remove duplicates
 ),
 tbl as (
 SELECT 
@@ -109,4 +110,4 @@ ORDER BY a1.Video_Series_Name, CAST(a1.SeasonNumber AS DECIMAL), CAST(a1.Episode
 select *, 
 updt as updated_date
 from tbl2
-group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35 -- final remove duplicates
