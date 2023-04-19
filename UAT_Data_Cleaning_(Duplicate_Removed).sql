@@ -1,5 +1,4 @@
-
-DECLARE updt DATE DEFAULT '2023-04-12'; --hard-coded cue point date
+DECLARE updt DATE DEFAULT '2023-04-19'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
@@ -12,36 +11,36 @@ group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,2
 tbl as (
 SELECT 
 
-  CASE WHEN seriesTitle IS NULL THEN assetName ELSE seriesTitle END AS Video_Series_Name,
+  CASE WHEN seriesTitle IS NULL THEN lower(assetName) ELSE lower(seriesTitle) END AS Video_Series_Name, -- standardized the format to lower case
 
 LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) as assetExternalID,
 --  CASE WHEN AssetName = "NULL" THEN NULL ELSE REGEXP_REPLACE(Asset_Name, 'Peacock: ', '') END AS Asset_Name, 
-  assetName,
+  a.assetName,
 --  CASE WHEN Asset_Duration = "NULL" THEN NULL ELSE Asset_Duration END AS Asset_Duration, 
-  assetDuration,
+  a.assetDuration,
 --  CASE WHEN Asset_Duration = "NULL" THEN NULL ELSE SAFE_CAST(Asset_Duration AS FLOAT64)/60 END AS Asset_Duration_minutes, 
-    SAFE_CAST(assetDuration AS FLOAT64)/60 AS Asset_Duration_minutes,
+    round(SAFE_CAST(assetDuration AS FLOAT64)/60,2) AS Asset_Duration_minutes,
   createdAt,
   agingDate,
 --  CASE WHEN total_number_of_cue_points = "NULL" THEN NULL ELSE total_number_of_cue_points END AS total_number_of_cue_points, 
-  cuePointLength,
+ ifnull(a.cuePointLength,0) as cuePointLength,
 --  CASE WHEN a.cue_point_sequence = "NULL" THEN NULL ELSE a.cue_point_sequence END AS cue_point_sequence,
-  a.cuePointPosition,
+  ifnull(a.cuePointPosition,0) as cuePointPosition,
 --  CASE WHEN contentTimePosition = "NULL" THEN NULL ELSE contentTimePosition END AS contentTimePosition,
-  contentTimePosition,
-  SAFE_CAST(contentTimePosition AS FLOAT64)/60 AS Content_Breaks,
-  SAFE_CAST(contentTimePosition AS FLOAT64)/SAFE_CAST(assetDuration AS FLOAT64) AS Content_Breaks_percent, --SAFE_DIVIDE?
+  ifnull(a.contentTimePosition,0) as contentTimePosition,
+  ifnull(SAFE_CAST(a.contentTimePosition AS FLOAT64)/60,0) AS Content_Breaks,
+  ifnull(SAFE_CAST(a.contentTimePosition AS FLOAT64)/SAFE_CAST(a.assetDuration AS FLOAT64),0) AS Content_Breaks_percent, --SAFE_DIVIDE?
   --custom cue point categorizations
-    CASE WHEN cuePointLength IS NULL THEN "NULL"
-         WHEN cuePointLength = a.cuePointLength THEN "END"
+    CASE WHEN a.cuePointLength IS NULL THEN "NULL"
+         WHEN a.cuePointLength = a.cuePointLength THEN "END"
          ELSE "MID"
          END AS ad_cue,
-    CASE WHEN cuePointLength IS NULL THEN SAFE_CAST(assetDuration AS FLOAT64) --NULL NP
-         WHEN cuePointLength = a.cuePointLength THEN (SAFE_CAST(assetDuration AS FLOAT64) - SAFE_CAST(contentTimePosition AS FLOAT64))/60 
+    CASE WHEN a.cuePointLength IS NULL THEN SAFE_CAST(a.assetDuration AS FLOAT64) --NULL NP
+         WHEN a.cuePointLength = a.cuePointLength THEN (SAFE_CAST(a.assetDuration AS FLOAT64) - SAFE_CAST(contentTimePosition AS FLOAT64))/60 
             ELSE (SAFE_CAST(next_break AS FLOAT64) - SAFE_CAST(contentTimePosition AS FLOAT64))/60
          END AS Content_Segments,
-    CASE WHEN cuePointLength IS NULL THEN SAFE_CAST(assetDuration AS FLOAT64) --NULL NP
-         WHEN cuePointLength = a.cuePointLength THEN (SAFE_CAST(assetDuration AS FLOAT64) - SAFE_CAST(contentTimePosition AS FLOAT64))/SAFE_CAST(assetDuration AS FLOAT64)
+    CASE WHEN a.cuePointLength IS NULL THEN SAFE_CAST(assetDuration AS FLOAT64) --NULL NP
+         WHEN a.cuePointLength = a.cuePointLength THEN (SAFE_CAST(assetDuration AS FLOAT64) - SAFE_CAST(contentTimePosition AS FLOAT64))/SAFE_CAST(assetDuration AS FLOAT64)
             ELSE ((SAFE_CAST(next_break AS FLOAT64) - SAFE_CAST(contentTimePosition AS FLOAT64))/SAFE_CAST(assetDuration AS FLOAT64))
          END AS Content_Segments_percent,
     CASE WHEN assetDuration IS NULL THEN NULL
@@ -58,8 +57,8 @@ LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExterna
     Primary_Genre,
     Secondary_Genre,
     ProductType,
-    b.SeasonNumber,
-    b.EpisodeNumber,
+    ifnull(b.SeasonNumber,0) as SeasonNumber,
+    ifnull(b.EpisodeNumber,0) as EpisodeNumber,
     TypeOfContent,
     Distributor,
     CoppaCompliance,
@@ -96,13 +95,14 @@ SELECT a1.*,
          WHEN SAFE_CAST(a1.cuePointLength AS INT64) = a1.ad_spec          THEN "At Spec"
          WHEN SAFE_CAST(a1.cuePointLength AS INT64) < a1.ad_spec          THEN "Below Spec"
          END AS ad_grade
-      , CAST(b1.ad_spec AS DECIMAL) / CAST(b1.cuePointLength AS DECIMAL) as Multiplier
-      , (CAST(b1.cuePointLength AS DECIMAL) + 1) / CAST(b1.cuePointLength AS DECIMAL) as Multiplier_just_one_more
-      , c1.Content_Segments_MAX, c1.Content_Segments_MAX / 2 AS Content_Segments_MAX_split
+      , safe_divide(CAST(b1.ad_spec AS DECIMAL), CAST(b1.cuePointLength AS DECIMAL)) as Mutiplier -- solve 0/0 issue
+      , safe_divide(CAST(b1.cuePointLength AS DECIMAL) + 1, CAST(b1.cuePointLength AS DECIMAL)) as Multiplier_just_one_more
+      , c1.Content_Segments_MAX
+      , c1.Content_Segments_MAX / 2 AS Content_Segments_MAX_split
 FROM tbl a1
   LEFT JOIN tbl b1 on a1.assetExternalID = b1.assetExternalID AND a1.cuePointLength = b1.cuePointPosition
   LEFT JOIN (select assetExternalID, MAX(Content_Segments) AS Content_Segments_MAX from tbl GROUP BY assetExternalID) c1 on a1.assetExternalID = c1.assetExternalID
--- WHERE lower(a1.assetName) NOT LIKE lower('%do%not%use%') AND lower(a1.distributor) NOT LIKE lower('%nbc%test%')
+WHERE lower(a1.assetName) NOT LIKE lower('%do%not%use%') AND lower(a1.distributor) NOT LIKE lower('%nbc%test%') -- filter out null values as well
 ORDER BY a1.Video_Series_Name, CAST(a1.SeasonNumber AS DECIMAL), CAST(a1.EpisodeNumber AS DECIMAL)
   , a1.assetName, CAST(a1.cuePointPosition AS DECIMAL), assetName
 )
