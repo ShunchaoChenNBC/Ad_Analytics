@@ -1,13 +1,56 @@
-DECLARE updt DATE DEFAULT '2023-04-19'; --hard-coded cue point date
+DECLARE updt DATE DEFAULT '2023-05-30'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
+
 with UAT as (
 select *
 from `nbcu-sdp-prod-003.sdp_persistent_views.FreewheelCuepointView`
 where EXTRACT(YEAR FROM effectiveTo) = 9999 --- Only select the latest records
 group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35 -- remove duplicates
 ),
+
+UAT1 as (
+select 
+seriesTitle,
+assetExternalID,
+assetName,
+assetDuration,
+genre,
+createdAt,
+agingDate,
+contentTimePosition,
+cuePointPosition,
+cuePointLength,
+seasonOrLibrary,
+dayPart,
+entitlement,
+case when (Episode is not null or cast(Episode as string) != "") then Episode else episodeNumber end as episodeNumber,
+case when (Season is not null or cast(Season as string) != "") then Season else seasonNumber end as seasonNumber,
+fullEpisode,
+language,
+promo,
+programmeType,
+effectiveFrom,
+effectiveTo,
+sdpDIFTimestamp,
+sdpSourceTimestamp,
+sdpBusinessDate,
+sdpETLTimestamp,
+sdpSourceSystemName,
+sdpSourceTransport,
+sdpSourceOrigin,
+sdpSource,
+sdpSourceType,
+sdpSourceTerritory,
+sdpSourceProvider,
+sdpSourceProposition,
+SDPSnapshotUpdateTimestamp
+from UAT u
+left join `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.Columbo_Mislabeled` m on lower(m.Video_Series_Name) = lower(u.seriesTitle) and lower(m.Asset_Name) = lower(u.assetName)
+), -- solve mislabel issue in Columbo
+
+
 tbl as (
 SELECT 
 
@@ -57,9 +100,9 @@ LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExterna
     Primary_Genre,
     Secondary_Genre,
     ProductType,
-    ifnull(b.SeasonNumber,0) as SeasonNumber,
-    ifnull(b.EpisodeNumber,0) as EpisodeNumber,
-    TypeOfContent,
+    ifnull(a.seasonNumber,0) as SeasonNumber,
+    ifnull(a.episodeNumber,0) as EpisodeNumber, --- Use UAT seasons & episodes instead of S&E in Compass
+    Case when lower(TypeOfContent) like "%d2c%" then "Peacock Original" else "Others" end as TypeOfContent, -- Simply type of content to 2 types
     Distributor,
     CoppaCompliance,
     adRequirementsOnAVOD,
@@ -77,7 +120,7 @@ LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExterna
          WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 THEN 10
          ELSE 13
          END AS ad_spec
-FROM UAT a
+FROM UAT1 a
 LEFT JOIN `nbcu-ds-prod-001.PeacockDataMartSilver.SILVER_COMPASS_METADATA` b 
     ON LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) = LOWER(b.ContentID)
 LEFT JOIN (SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(assetExternalID,'_UHDDV',''),'_HDSDR',''),'_UHDSDR',''),'_UHDHDR','')) as assetExternalID, 
