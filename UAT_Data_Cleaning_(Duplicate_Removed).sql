@@ -1,4 +1,3 @@
-DECLARE updt DATE DEFAULT '2023-05-30'; --hard-coded cue point date
 
 --no need to run anymore, just having for Table referencing
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
@@ -45,10 +44,11 @@ sdpSourceType,
 sdpSourceTerritory,
 sdpSourceProvider,
 sdpSourceProposition,
-SDPSnapshotUpdateTimestamp
+SDPSnapshotUpdateTimestamp,
+dense_rank() over (partition by seriesTitle, SeasonNumber, EpisodeNumber order by SDPSnapshotUpdateTimestamp desc) as  rk
 from UAT u
 left join `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.Columbo_Mislabeled` m on lower(m.Video_Series_Name) = lower(u.seriesTitle) and lower(m.Asset_Name) = lower(u.assetName)
-), -- solve mislabel issue in Columbo
+),
 
 
 tbl as (
@@ -127,6 +127,7 @@ LEFT JOIN (SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPL
 cuePointPosition, contentTimePosition as next_break
            FROM  UAT) c 
     ON a.assetExternalID = c.assetExternalID AND SAFE_CAST(a.cuePointPosition AS INT64) = SAFE_CAST(c.cuePointPosition AS INT64)-1
+where rk = 1 -- select the latest timestamp
 ),
 tbl2 as (
 SELECT a1.*, 
@@ -151,6 +152,6 @@ ORDER BY a1.Video_Series_Name, CAST(a1.SeasonNumber AS DECIMAL), CAST(a1.Episode
 )
 
 select *, 
-updt as updated_date
+current_date("America/New_York")-1 as updated_date
 from tbl2
 group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35 -- final remove duplicates
