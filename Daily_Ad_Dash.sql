@@ -109,13 +109,22 @@ LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExterna
     Rev_Share,
   --ad grade prep
     CASE WHEN assetDuration IS NULL THEN 0 -- NP
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 THEN 0
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 THEN 2
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 THEN 3
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 THEN 5
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 THEN 6
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 THEN 8
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 THEN 10
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 and b.Primary_Genre = "Movies" THEN 0
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 and b.Primary_Genre = "Movies" THEN 2
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 and b.Primary_Genre = "Movies" THEN 3
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 and b.Primary_Genre = "Movies" THEN 5
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 and b.Primary_Genre = "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 and b.Primary_Genre = "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 and b.Primary_Genre = "Movies" THEN 10
+        WHEN SAFE_CAST(assetDuration AS INT64)/60 < 180 and b.Primary_Genre = "Movies" THEN 13
+        WHEN SAFE_CAST(assetDuration AS INT64)/60 >= 180 and b.Primary_Genre = "Movies" THEN 15 -- add additional bracket to separate Movie and other (TV) bracklets
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 and b.Primary_Genre != "Movies" THEN 0
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 and b.Primary_Genre != "Movies" THEN 2
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 and b.Primary_Genre != "Movies" THEN 3
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 and b.Primary_Genre != "Movies" THEN 5
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 and b.Primary_Genre != "Movies" THEN 6
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 and b.Primary_Genre != "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 and b.Primary_Genre != "Movies" THEN 10
          ELSE 13
          END AS ad_spec
 FROM UAT1 a
