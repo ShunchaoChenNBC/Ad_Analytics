@@ -1,5 +1,6 @@
 
 --no need to run anymore, just having for Table referencing
+
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
 
 with UAT as (
@@ -111,13 +112,22 @@ LOWER(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(a.assetExterna
     Rev_Share,
   --ad grade prep
     CASE WHEN assetDuration IS NULL THEN 0 -- NP
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 THEN 0
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 THEN 2
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 THEN 3
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 THEN 5
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 THEN 6
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 THEN 8
-         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 THEN 10
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 and b.Primary_Genre = "Movies" THEN 0
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 and b.Primary_Genre = "Movies" THEN 2
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 and b.Primary_Genre = "Movies" THEN 3
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 and b.Primary_Genre = "Movies" THEN 5
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 and b.Primary_Genre = "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 and b.Primary_Genre = "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 and b.Primary_Genre = "Movies" THEN 10
+        WHEN SAFE_CAST(assetDuration AS INT64)/60 < 180 and b.Primary_Genre = "Movies" THEN 13
+        WHEN SAFE_CAST(assetDuration AS INT64)/60 >= 180 and b.Primary_Genre = "Movies" THEN 15 -- add additional bracket to separate Movie and other (TV) bracklets
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 and b.Primary_Genre != "Movies" THEN 0
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 and b.Primary_Genre != "Movies" THEN 2
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 and b.Primary_Genre != "Movies" THEN 3
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 and b.Primary_Genre != "Movies" THEN 5
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 and b.Primary_Genre != "Movies" THEN 6
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 and b.Primary_Genre != "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 and b.Primary_Genre != "Movies" THEN 10
          ELSE 13
          END AS ad_spec
 FROM UAT1 a
@@ -149,9 +159,22 @@ FROM tbl a1
 WHERE lower(a1.assetName) NOT LIKE lower('%do%not%use%') AND lower(a1.distributor) NOT LIKE lower('%nbc%test%') -- filter out null values as well
 ORDER BY a1.Video_Series_Name, CAST(a1.SeasonNumber AS DECIMAL), CAST(a1.EpisodeNumber AS DECIMAL)
   , a1.assetName, CAST(a1.cuePointPosition AS DECIMAL), assetName
-)
+),
 
-select *, 
-current_date("America/New_York")-1 as updated_date
+remove_duplicates as (
+select *
 from tbl2
-group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35 -- final remove duplicates
+group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34 -- final remove duplicates
+),
+
+
+tbl3 as (select *, 
+lag(contentTimePosition) over (partition by Video_Series_Name,SeasonNumber,EpisodeNumber order by cuePointPosition) as Last_contentTimePosition,
+current_date("America/New_York")-1 as updated_date
+from remove_duplicates)
+
+select *,
+round((contentTimePosition - ifnull(Last_contentTimePosition,0)),2) as Ad_Breaks_Interval
+from tbl3
+
+
