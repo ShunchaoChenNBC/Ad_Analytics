@@ -1,6 +1,5 @@
 
 --no need to run anymore, just having for Table referencing
-
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
 
 with UAT as (
@@ -167,14 +166,59 @@ from tbl2
 group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34 -- final remove duplicates
 ),
 
+Combination as (
+(select *,
+cuePointPosition as Interval_Segments -- Add to calculate the interval between last cue point and the end of the video
+from remove_duplicates)
+union all
+(select 
+Video_Series_Name,
+assetExternalID,
+assetName,
+assetDuration,
+null as Asset_Duration_minutes,
+null as createdAt,
+null as agingDate,
+cuePointLength,
+cuePointLength+1 as cuePointPosition,
+assetDuration as contentTimePosition,
+null as Content_Breaks,
+null as Content_Breaks_percent,
+null as ad_cue,
+null as Content_Segments,
+null as Content_Segments_percent,
+null as duration,
+Primary_Genre,
+Secondary_Genre,
+ProductType,
+SeasonNumber,
+EpisodeNumber,
+TypeOfContent,
+null as Distributor,
+null as CoppaCompliance,
+null as adRequirementsOnAVOD,
+null as adRequirementsOnPremiumTier,
+null as adRequirementsOnPremiumPlusTier,
+null as Rev_Share,
+ad_spec,
+ad_grade,
+null as Mutiplier,
+null as Multiplier_just_one_more,
+null as Content_Segments_MAX,
+null as Content_Segments_MAX_split,
+cuePointLength+1 as Interval_Segments,
+from remove_duplicates
+group by Video_Series_Name, assetExternalID, assetName, assetDuration, cuePointLength, cuePointPosition, contentTimePosition,Primary_Genre,
+Secondary_Genre,ProductType, Interval_Segments, SeasonNumber, EpisodeNumber, TypeOfContent, ad_spec, ad_grade)
+), --- add this section to calculate the intervals between last cue point to the end
+
+
 
 tbl3 as (select *, 
-lag(contentTimePosition) over (partition by Video_Series_Name,SeasonNumber,EpisodeNumber order by cuePointPosition) as Last_contentTimePosition,
+lag(contentTimePosition) over (partition by Video_Series_Name,SeasonNumber,EpisodeNumber order by Interval_Segments) as Last_contentTimePosition,
 current_date("America/New_York")-1 as updated_date
-from remove_duplicates)
+from Combination)
 
 select *,
 round((contentTimePosition - ifnull(Last_contentTimePosition,0)),2) as Ad_Breaks_Interval
 from tbl3
-
-
