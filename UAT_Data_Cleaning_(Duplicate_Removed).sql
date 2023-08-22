@@ -1,5 +1,7 @@
 
 --no need to run anymore, just having for Table referencing
+
+
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
 
 with UAT as (
@@ -187,7 +189,7 @@ null as Content_Breaks_percent,
 null as ad_cue,
 null as Content_Segments,
 null as Content_Segments_percent,
-null as duration,
+duration, -- deal with duration null value on dashboard
 Primary_Genre,
 Secondary_Genre,
 ProductType,
@@ -208,7 +210,7 @@ null as Content_Segments_MAX,
 null as Content_Segments_MAX_split,
 cuePointLength+1 as Interval_Segments,
 from remove_duplicates
-group by Video_Series_Name, assetExternalID, assetName, assetDuration, cuePointLength, cuePointPosition, contentTimePosition,Primary_Genre,
+group by Video_Series_Name, assetExternalID, assetName, assetDuration, cuePointLength, cuePointPosition, contentTimePosition,duration,Primary_Genre,
 Secondary_Genre,ProductType, Interval_Segments, SeasonNumber, EpisodeNumber, TypeOfContent, ad_spec, ad_grade)
 ), --- add this section to calculate the intervals between last cue point to the end
 
