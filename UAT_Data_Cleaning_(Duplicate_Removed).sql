@@ -157,7 +157,8 @@ SELECT a1.*,
 FROM tbl a1
   LEFT JOIN tbl b1 on a1.assetExternalID = b1.assetExternalID AND a1.cuePointLength = b1.cuePointPosition
   LEFT JOIN (select assetExternalID, MAX(Content_Segments) AS Content_Segments_MAX from tbl GROUP BY assetExternalID) c1 on a1.assetExternalID = c1.assetExternalID
-WHERE lower(a1.assetName) NOT LIKE lower('%do%not%use%') AND lower(a1.distributor) NOT LIKE lower('%nbc%test%') -- filter out null values as well
+WHERE lower(a1.assetName) NOT LIKE lower('%do%not%use%') 
+  -- AND lower(a1.distributor) NOT LIKE lower('%nbc%test%') -- filter out null values as well so it filter out titles like "the office" S2E18
 ORDER BY a1.Video_Series_Name, CAST(a1.SeasonNumber AS DECIMAL), CAST(a1.EpisodeNumber AS DECIMAL)
   , a1.assetName, CAST(a1.cuePointPosition AS DECIMAL), assetName
 ),
