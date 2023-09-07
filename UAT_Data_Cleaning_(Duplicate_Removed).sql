@@ -1,8 +1,5 @@
-
---no need to run anymore, just having for Table referencing
-
-
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
+
 
 with UAT as (
 select *
@@ -169,10 +166,66 @@ from tbl2
 group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34 -- final remove duplicates
 ),
 
+
+----set up a reference table to detect the null values in Primary Genre, Secondary Genre, Product Type for some titles like "office S2E18"
+
+ref_table as (
+select Video_Series_Name,Primary_Genre,Secondary_Genre,ProductType
+from remove_duplicates
+where Video_Series_Name in (
+select Video_Series_Name
+from remove_duplicates
+where Primary_Genre is null and Secondary_Genre is null and ProductType is null and SeasonNumber != 0 and EpisodeNumber != 0
+group by 1)
+and Primary_Genre is not null and Secondary_Genre is not null and ProductType is not null
+group by 1,2,3,4
+),
+
+Filled_CTE as (
+select 
+d.Video_Series_Name,
+assetExternalID,
+assetName,
+assetDuration,
+Asset_Duration_minutes,
+createdAt,
+agingDate,
+cuePointLength,
+cuePointPosition,
+contentTimePosition,
+Content_Breaks,
+Content_Breaks_percent,
+ad_cue,
+Content_Segments,
+Content_Segments_percent,
+duration, -- deal with duration null value on dashboard
+case when d.Primary_Genre is null and SeasonNumber != 0 and EpisodeNumber != 0 then r.Primary_Genre else d.Primary_Genre end as Primary_Genre, -- fill null value in some titles
+case when d.Secondary_Genre is null and SeasonNumber != 0 and EpisodeNumber != 0 then r.Secondary_Genre else d.Secondary_Genre end as Secondary_Genre,-- fill null value in some titles
+case when d.ProductType is null and SeasonNumber != 0 and EpisodeNumber != 0 then r.ProductType else d.ProductType end as ProductType, -- fill null value in some titles
+SeasonNumber,
+EpisodeNumber,
+TypeOfContent,
+Distributor,
+CoppaCompliance,
+adRequirementsOnAVOD,
+adRequirementsOnPremiumTier,
+adRequirementsOnPremiumPlusTier,
+Rev_Share,
+ad_spec,
+ad_grade,
+Mutiplier,
+Multiplier_just_one_more,
+Content_Segments_MAX,
+Content_Segments_MAX_split,
+from remove_duplicates d
+left join ref_table r on r.Video_Series_Name = d.Video_Series_Name
+),
+
+
 Combination as (
 (select *,
 cuePointPosition as Interval_Segments -- Add to calculate the interval between last cue point and the end of the video
-from remove_duplicates)
+from Filled_CTE)
 union all
 (select 
 Video_Series_Name,
@@ -210,7 +263,7 @@ null as Multiplier_just_one_more,
 null as Content_Segments_MAX,
 null as Content_Segments_MAX_split,
 cuePointLength+1 as Interval_Segments,
-from remove_duplicates
+from Filled_CTE
 group by Video_Series_Name, assetExternalID, assetName, assetDuration, cuePointLength, cuePointPosition, contentTimePosition,duration,Primary_Genre,
 Secondary_Genre,ProductType, Interval_Segments, SeasonNumber, EpisodeNumber, TypeOfContent, ad_spec, ad_grade)
 ), --- add this section to calculate the intervals between last cue point to the end
