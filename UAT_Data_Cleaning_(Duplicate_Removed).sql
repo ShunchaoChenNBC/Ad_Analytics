@@ -1,6 +1,7 @@
 CREATE OR REPLACE TABLE `nbcu-ds-sandbox-a-001.Shunchao_Sandbox.ad_exp_cue_point_summary_no_duplicates` as
 
 
+
 with UAT as (
 select *
 from `nbcu-sdp-prod-003.sdp_persistent_views.FreewheelCuepointView`
@@ -168,9 +169,8 @@ group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,2
 
 
 ----set up a reference table to detect the null values in Primary Genre, Secondary Genre, Product Type for some titles like "office S2E18"
-
 ref_table as (
-select Video_Series_Name,Primary_Genre,Secondary_Genre,ProductType
+select Video_Series_Name,min(Primary_Genre) as Primary_Genre,min(Secondary_Genre) as Secondary_Genre,min(ProductType) as ProductType -- avoid 1 to many situation
 from remove_duplicates
 where Video_Series_Name in (
 select Video_Series_Name
@@ -178,7 +178,7 @@ from remove_duplicates
 where Primary_Genre is null and Secondary_Genre is null and ProductType is null and SeasonNumber != 0 and EpisodeNumber != 0
 group by 1)
 and Primary_Genre is not null and Secondary_Genre is not null and ProductType is not null
-group by 1,2,3,4
+group by 1
 ),
 
 Filled_CTE as (
@@ -262,18 +262,157 @@ null as Mutiplier,
 null as Multiplier_just_one_more,
 null as Content_Segments_MAX,
 null as Content_Segments_MAX_split,
-cuePointLength+1 as Interval_Segments,
+cuePointLength+1 as Interval_Segments
 from Filled_CTE
 group by Video_Series_Name, assetExternalID, assetName, assetDuration, cuePointLength, cuePointPosition, contentTimePosition,duration,Primary_Genre,
 Secondary_Genre,ProductType, Interval_Segments, SeasonNumber, EpisodeNumber, TypeOfContent, ad_spec, ad_grade)
 ), --- add this section to calculate the intervals between last cue point to the end
 
+Combination_Ad_Spec as (
+select
+Video_Series_Name,
+assetExternalID,
+assetName,
+assetDuration,
+Asset_Duration_minutes,
+createdAt,
+agingDate,
+cuePointLength,
+cuePointPosition,
+contentTimePosition,
+Content_Breaks,
+Content_Breaks_percent,
+ad_cue,
+Content_Segments,
+Content_Segments_percent,
+duration, -- deal with duration null value on dashboard
+Primary_Genre,
+Secondary_Genre,
+ProductType,
+SeasonNumber,
+EpisodeNumber,
+TypeOfContent,
+Distributor,
+CoppaCompliance,
+adRequirementsOnAVOD,
+adRequirementsOnPremiumTier,
+adRequirementsOnPremiumPlusTier,
+Rev_Share,
+CASE WHEN assetDuration IS NULL THEN 0 -- NP
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 and Primary_Genre = "Movies" THEN 0
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 and Primary_Genre = "Movies" THEN 2
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 and Primary_Genre = "Movies" THEN 3
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 and Primary_Genre = "Movies" THEN 5
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 and Primary_Genre = "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 and Primary_Genre = "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 and Primary_Genre = "Movies" THEN 10
+        WHEN SAFE_CAST(assetDuration AS INT64)/60 < 180 and Primary_Genre = "Movies" THEN 13
+        WHEN SAFE_CAST(assetDuration AS INT64)/60 >= 180 and Primary_Genre = "Movies" THEN 15 -- add additional bracket to separate Movie and other (TV) bracklets
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 10 and Primary_Genre != "Movies" THEN 0
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 20 and Primary_Genre != "Movies" THEN 2
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 40 and Primary_Genre != "Movies" THEN 3
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 60 and Primary_Genre != "Movies" THEN 5
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 90 and Primary_Genre != "Movies" THEN 6
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 120 and Primary_Genre != "Movies" THEN 8
+         WHEN SAFE_CAST(assetDuration AS INT64)/60 < 150 and Primary_Genre != "Movies" THEN 10
+         ELSE 13
+         END AS ad_spec, -- re-calculate ad_spec to avoid 13 for null value
+ad_grade,
+Mutiplier,
+Multiplier_just_one_more,
+Content_Segments_MAX,
+Content_Segments_MAX_split,
+Interval_Segments
+from Combination
+),
+
+
+Combination_Ad_Grade as (
+select
+Video_Series_Name,
+assetExternalID,
+assetName,
+assetDuration,
+Asset_Duration_minutes,
+createdAt,
+agingDate,
+cuePointLength,
+cuePointPosition,
+contentTimePosition,
+Content_Breaks,
+Content_Breaks_percent,
+ad_cue,
+Content_Segments,
+Content_Segments_percent,
+duration, -- deal with duration null value on dashboard
+Primary_Genre,
+Secondary_Genre,
+ProductType,
+SeasonNumber,
+EpisodeNumber,
+TypeOfContent,
+Distributor,
+CoppaCompliance,
+adRequirementsOnAVOD,
+adRequirementsOnPremiumTier,
+adRequirementsOnPremiumPlusTier,
+Rev_Share,
+ad_spec, 
+CASE WHEN cuePointLength IS NULL AND assetDuration IS NULL   THEN "NULL"
+      WHEN cuePointLength IS NULL AND ad_spec = 0               THEN "At Spec"
+      WHEN cuePointLength IS NULL                               THEN "Below Spec"
+      WHEN SAFE_CAST(cuePointLength AS INT64) > ad_spec          THEN "Above Spec"
+      WHEN SAFE_CAST(cuePointLength AS INT64) = ad_spec          THEN "At Spec"
+      WHEN SAFE_CAST(cuePointLength AS INT64) < ad_spec          THEN "Below Spec"
+      END AS ad_grade,-- re-calculate ad_grade to avoid inccuracy of ad spec
+Mutiplier,
+Multiplier_just_one_more,
+Content_Segments_MAX,
+Content_Segments_MAX_split,
+Interval_Segments
+from Combination_Ad_Spec
+),
+
+-- avoid duplicated in aging date and filter out all irrelvant columns to reduce duplication risk
+Final_remove_duplicates as (
+select 
+Video_Series_Name,
+assetExternalID,
+assetName,
+assetDuration,
+Asset_Duration_minutes,
+cuePointLength,
+cuePointPosition,
+contentTimePosition,
+Content_Breaks,
+Content_Breaks_percent,
+ad_cue,
+Content_Segments,
+Content_Segments_percent,
+duration,
+Primary_Genre,
+Secondary_Genre,
+ProductType,
+SeasonNumber,
+EpisodeNumber,
+TypeOfContent,
+Distributor,
+ad_spec,
+ad_grade,
+Mutiplier,
+Multiplier_just_one_more,
+Content_Segments_MAX,
+Content_Segments_MAX_split,
+Interval_Segments
+from Combination_Ad_Grade
+group by  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28 -- final remove duplicates
+),
 
 
 tbl3 as (select *, 
 lag(contentTimePosition) over (partition by Video_Series_Name,SeasonNumber,EpisodeNumber order by Interval_Segments) as Last_contentTimePosition,
 current_date("America/New_York")-1 as updated_date
-from Combination)
+from Final_remove_duplicates)
 
 select *,
 round((contentTimePosition - ifnull(Last_contentTimePosition,0)),2) as Ad_Breaks_Interval
